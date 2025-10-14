@@ -108,13 +108,21 @@ PY
    ```
    Use `gvmagdb extract --hits gvmagdb_hits.tsv --fasta filtered_hits.faa --seq-type AA` to repackage results for downstream workflows.
 
-## 4. Plotly Dashboards (Planned)
-- **Goal**: deliver interactive analytics via Plotly Dash hosted on `newlineages.com` through Cloudflare Tunnel.
-- **Proposed stack**:
-  - Dash app in `src/gvmagdb/analytics/dashboard.py`, reading DuckDB views in read-only mode.
-  - Pre-computed parquet summaries (`docs/releases/<version>.json`) for lightweight rendering.
-  - Deployment using `pixi run python -m gvmagdb.analytics.dashboard --port 8050`.
-  - Cloudflare Tunnel configuration stored under `infrastructure/cloudflare/`, mapping `https://newlineages.com/gvmagdb`.
-- **Next steps**: define API boundaries (read-only endpoints), produce mock layouts (genome size histograms, taxonomy sunburst, search hit explorer), and add automated screenshots to release notes.
+## 4. Plotly Dashboards
+- **Launch locally**:
+  ```bash
+  pixi run dashboard
+  ```
+  The app runs at `http://127.0.0.1:8050` by default and automatically loads assets from `dashboard/assets/`.
+- **Pages included**:
+  1. Overview – KPI cards plus quick taxonomy/environment snapshots.
+  2. Taxonomy Explorer – compare GVClass vs phylogenomic assignments, drill down by rank.
+  3. Environment & Ecosystems – visualise genome counts by ecosystem, habitat, and source.
+  4. Genome Statistics – interactively inspect genome length, GC%, coding density, and completeness.
+  5. Annotations – heatmaps for COG/KEGG/PFAM signals across GVClass orders.
+  6. Clusters & Quality – summarise ANI clusters and representative coverage.
+- **Data access**: the Dash app calls the shared DuckDB catalog (read-only) via `gvmagdb.analytics.data_access`, so no additional ingestion is required as long as `artifacts/parquet/` and `artifacts/products/` are present.
+- **Deployment**: wrap the app with Gunicorn or waitress (`python -m gvmagdb.analytics.app`) and expose via Cloudflare Tunnel (see `Cloudflare` configuration under `infrastructure/`, pending). Configure `GVMAGDB_PARQUET_GLOB`, `GVMAGDB_DASH_HOST`, `GVMAGDB_DASH_PORT`, and `GVMAGDB_DASH_DEBUG` environment variables as needed.
+- **Enhancements**: pre-compute heavy aggregates into `artifacts/analytics/` when dashboards start to receive production traffic; add authentication before exposing the app publicly.
 
 Keep this document updated as commands evolve or the dashboard implementation lands.***

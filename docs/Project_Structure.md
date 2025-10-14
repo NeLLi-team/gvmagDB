@@ -6,11 +6,13 @@ gvmagDB/
 ├── src/gvmagdb/           # Installable Python package
 │   ├── cli.py             # Entry point wired to `gvmagdb` console script
 │   ├── analyze/           # Search & analytics commands
+│   ├── analytics/         # Plotly Dash dashboards & data access helpers
 │   ├── core/              # Shared infrastructure (DuckDB catalog, TNF math, registries)
 │   ├── export/            # DIAMOND builder and FASTA/TSV exporters
 │   └── prepare/           # Ingestion flows and annotation parsing
 ├── tests/                 # Pytest suites (unit + integration)
 │   └── data/              # Lightweight fixtures used by tests and demos
+├── dashboard/assets/      # Shared CSS/assets loaded by the Dash app
 ├── artifacts/             # Generated Parquet + search indices (ignored)
 │   ├── parquet/           # Primary columnar storage
 │   ├── products/          # DIAMOND, FASTA, skani references
@@ -25,6 +27,7 @@ gvmagDB/
 ## Module Overview
 - `analyze/analyze_genome.py`: combines TNF and ANI comparisons for genome placement.
 - `analyze/run_*`: wrappers for DIAMOND, PyHMMER, and Skani search flows.
+- `analytics/`: Dash app (`app.py`), shared layout, and data access utilities.
 - `core/catalog.py`: central DuckDB connection factory and schema helpers.
 - `core/tnf.py`: Numba-accelerated TNF feature generation.
 - `core/registry.py`: tracks generated product versions and checksums.

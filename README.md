@@ -16,6 +16,7 @@ pixi run ingest \                # ingest genomes + metadata from FASTA/TSV
   --faa ingestion_data/gvmagsV2all.faa \
   --metadata ingestion_data/Updated_naming_Sept2025.tsv
 pixi run stats                   # report high-level database metrics
+pixi run dashboard               # launch the interactive analytics UI
 ```
 Daily development helpers:
 - `pixi run fmt`, `pixi run lint`, `pixi run typecheck` (or `pixi run check` for the full bundle).
