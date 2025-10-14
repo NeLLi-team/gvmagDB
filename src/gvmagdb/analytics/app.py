@@ -35,7 +35,7 @@ server = app.server
 def main() -> None:
     """CLI entrypoint used by pixi."""
 
-    app.run_server(host=SETTINGS.host, port=SETTINGS.port, debug=SETTINGS.debug)
+    app.run(host=SETTINGS.host, port=SETTINGS.port, debug=SETTINGS.debug)
 
 
 if __name__ == "__main__":

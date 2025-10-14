@@ -7,7 +7,7 @@ import dash_bootstrap_components as dbc
 import plotly.express as px
 from dash import dcc, html
 
-from .. import data_access
+from gvmagdb.analytics import data_access
 
 dash.register_page(__name__, path="/clusters", name="Clusters & Quality", order=5)
 

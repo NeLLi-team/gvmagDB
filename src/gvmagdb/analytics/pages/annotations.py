@@ -7,7 +7,7 @@ import dash_bootstrap_components as dbc
 import plotly.express as px
 from dash import Input, Output, dcc, html
 
-from .. import data_access
+from gvmagdb.analytics import data_access
 
 dash.register_page(__name__, path="/annotations", name="Annotations", order=4)
 
