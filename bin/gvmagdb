@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# Wrapper script to run gvmagdb from anywhere
+# This script locates the gvmagDB installation and runs commands via pixi
+
+# Find the gvmagDB installation directory
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+GVMAGDB_ROOT="$( cd "$SCRIPT_DIR/.." && pwd )"
+
+# Check if pixi.toml exists
+if [ ! -f "$GVMAGDB_ROOT/pixi.toml" ]; then
+    echo "Error: Could not find gvmagDB installation (pixi.toml not found)" >&2
+    exit 1
+fi
+
+# Run the command via pixi using --manifest-path
+# This keeps the current working directory so relative paths work correctly
+exec pixi run --manifest-path "$GVMAGDB_ROOT/pixi.toml" python -m gvmagdb.cli "$@"

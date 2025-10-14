@@ -1,0 +1,76 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+venv/
+ENV/
+env/
+.venv
+
+# Pixi
+.pixi/
+pixi.lock
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.hypothesis/
+
+# Type checking
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# Large data directories (compress to tar.gz for distribution)
+# Generated data bundles
+ingestion_data/
+artifacts/
+data/registry/
+*.tar.gz
+
+# Logs (generated)
+logs/
+
+# Temporary files
+*.tmp
+*.log
+.DS_Store
+
+# Generated LinkML artifacts
+schemas/generated/*.json
+schemas/generated/*.py
+schemas/generated/*.jsonld
+schemas/generated/*.shex
+schemas/generated/*.owl

@@ -1,0 +1,2 @@
+Ref_file	Query_file	ANI	Align_fraction_ref	Align_fraction_query	Ref_name	Query_name
+tests/data/test_small.fna	tests/data/test_small.fna	100.00	99.92	99.92	AbALV|LC506465__1	AbALV|LC506465__1

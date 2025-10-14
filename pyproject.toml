@@ -1,0 +1,46 @@
+[build-system]
+requires = [ "setuptools>=61.0", "wheel",]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gvmagdb"
+version = "0.1.0"
+description = "Genome database with DuckDB backend and bioinformatics search capabilities"
+readme = "docs/README.md"
+requires-python = ">=3.10"
+classifiers = [ "Development Status :: 3 - Alpha", "Intended Audience :: Science/Research", "Topic :: Scientific/Engineering :: Bio-Informatics", "Programming Language :: Python :: 3", "Programming Language :: Python :: 3.10", "Programming Language :: Python :: 3.11", "Programming Language :: Python :: 3.12",]
+dependencies = [ "duckdb>=1.1", "biopython>=1.83", "pandas>=2.2", "pyarrow>=17.0", "linkml>=1.8", "linkml-runtime>=1.8", "click>=8.1", "rich>=13.0", "pydantic>=2.0", "numpy>=1.26",]
+[[project.authors]]
+name = "Frederik Schulz"
+email = "fschulz@lbl.gov"
+
+[project.optional-dependencies]
+dev = [ "pytest>=8.0", "pytest-cov>=5.0", "black>=24.0", "ruff>=0.6", "mypy>=1.11", "jupyter>=1.0", "ipykernel>=6.29",]
+
+[project.scripts]
+gvmagdb = "gvmagdb.cli:main"
+
+[tool.black]
+line-length = 100
+target-version = [ "py310", "py311", "py312",]
+include = "\\.pyi?$"
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+select = [ "E", "W", "F", "I", "B", "C4", "UP",]
+ignore = [ "E501",]
+
+[tool.mypy]
+ignore_errors = true
+
+[tool.pytest.ini_options]
+testpaths = [ "tests",]
+python_files = [ "test_*.py",]
+python_classes = [ "Test*",]
+python_functions = [ "test_*",]
+addopts = "-v --strict-markers"
+markers = [ "slow: marks tests as slow (deselect with '-m \"not slow\"')", "integration: marks tests as integration tests",]
+
+[tool.setuptools.packages.find]
+where = [ "src",]
