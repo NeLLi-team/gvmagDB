@@ -15,6 +15,7 @@ pixi run ingest \                # ingest genomes + metadata from FASTA/TSV
   --fna ingestion_data/gvmagsV2all.fna \
   --faa ingestion_data/gvmagsV2all.faa \
   --metadata ingestion_data/Updated_naming_Sept2025.tsv
+pixi run dashboard-cache         # pre-compute dashboard summaries (optional but recommended)
 pixi run stats                   # report high-level database metrics
 pixi run dashboard               # launch the interactive analytics UI
 ```
@@ -40,7 +41,7 @@ flowchart LR
     end
     subgraph Workflows
         G[Query: gvmagdb diamond/hmmsearch/skani]
-        H[Analytics: docs/Database_Workflows<br/>Plotly dashboards (planned)]
+        H[Analytics: docs/Database_Workflows<br/>Plotly Dash app]
     end
 
     A --> B
@@ -55,7 +56,14 @@ flowchart LR
 
 - Ingestion pulls FASTA/metadata from `ingestion_data/`, enriches with ProteinOrtho & eggNOG annotations, and writes Parquet partitions plus search products into `artifacts/`.
 - Query commands read DuckDB views (no duplication) and reuse generated FASTA/DMND artifacts.
-- Planned analytics dashboards consume the same artifacts via read-only DuckDB connections (see `docs/Database_Workflows.md` and `docs/Repository_Guidelines.md`).
+- The Plotly Dash dashboards consume the same artifacts via read-only DuckDB connections (see `docs/Database_Workflows.md` and `docs/Repository_Guidelines.md`).
+
+## Analytics Cache
+
+The dashboards scan ~5M sequences; precomputing aggregates keeps page loads responsive.
+
+- Run `pixi run dashboard-cache` after ingestion or whenever the database changes. Results live under `artifacts/analytics/` (override via `GVMAGDB_ANALYTICS_CACHE_DIR`).
+- At runtime the data-access layer automatically reads cached Parquet files. Set `GVMAGDB_ANALYTICS_CACHE=false` to bypass caching during development.
 
 ## Further Reading
 - [Repository Guidelines](docs/Repository_Guidelines.md) – coding style, testing, PR hygiene.

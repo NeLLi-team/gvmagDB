@@ -61,14 +61,33 @@ def _resolve_parquet_glob(parquet_glob: str | None) -> str:
     return parquet_glob or SETTINGS.parquet_glob
 
 
+def _limit_clause(limit: int | None) -> str:
+    return f"LIMIT {limit}" if limit is not None else ""
+
+
+@lru_cache(maxsize=64)
+def _cached_parquet(path: str) -> pd.DataFrame:
+    return pd.read_parquet(path)
+
+
+def _cache_frame(name: str) -> pd.DataFrame | None:
+    if not SETTINGS.cache_enabled:
+        return None
+    path = SETTINGS.cache_dir / name
+    if not path.exists():
+        return None
+    return _cached_parquet(str(path))
+
+
 def _gvclass_rank_expr(level: str, fallback: str = "'Unassigned'") -> str:
+    raw = _gvclass_rank_raw(level)
+    return "COALESCE(" f"NULLIF(NULLIF({raw}, ''), 'NA'), {fallback})"
+
+
+def _gvclass_rank_raw(level: str) -> str:
     prefix = GVCLASS_PREFIX[level]
     pattern = f"{prefix}_([^;]+)"
-    return (
-        "COALESCE("
-        f"NULLIF(NULLIF(regexp_extract(taxonomy_majority, '{pattern}', 1), ''), 'NA'), "
-        f"{fallback})"
-    )
+    return f"regexp_extract(taxonomy_majority, '{pattern}', 1)"
 
 
 @contextmanager
@@ -91,8 +110,25 @@ def _frame_from_query(query: str, parquet_glob: str | None = None, **params) -> 
 
 
 @lru_cache(maxsize=1)
-def fetch_overview_metrics(parquet_glob: str | None = None) -> dict[str, float]:
+def fetch_overview_metrics(
+    parquet_glob: str | None = None,
+    *,
+    use_cache: bool = True,
+) -> dict[str, float]:
     """Return high-level summary metrics used on the overview page."""
+
+    if use_cache:
+        cache = _cache_frame("overview.parquet")
+        if cache is not None and not cache.empty:
+            row = cache.iloc[0]
+            return {
+                "total_sequences": float(row["total_sequences"]),
+                "unique_genomes": float(row["unique_genomes"]),
+                "taxonomy_labels": float(row["taxonomy_labels"]),
+                "gvclass_species": float(row["gvclass_species"]),
+                "ani_clusters": float(row["ani_clusters"]),
+                "avg_gc_nt": float(row["avg_gc_nt"]),
+            }
 
     row = _frame_from_query(
         """
@@ -122,43 +158,67 @@ def fetch_taxonomy_distribution(
     level: Literal["domain", "phylum", "class", "order", "family", "genus", "species"],
     source: Literal["gvclass", "phylo"] = "gvclass",
     parquet_glob: str | None = None,
-    limit: int = 25,
+    limit: int | None = 25,
+    *,
+    use_cache: bool = True,
 ) -> pd.DataFrame:
     """Return taxonomy counts for the requested level and source."""
 
+    cache_name = f"taxonomy_{source}_{level}.parquet"
+    if use_cache:
+        cache = _cache_frame(cache_name)
+        if cache is not None:
+            return cache.head(limit) if limit else cache.copy()
+
     if source == "gvclass":
-        label_expr = _gvclass_rank_expr(level)
-        return _frame_from_query(
+        raw = _gvclass_rank_raw(level)
+        limit_sql = _limit_clause(limit)
+        df = _frame_from_query(
             f"""
-            SELECT
-                {label_expr} AS label,
-                COUNT(DISTINCT dataset_id) AS genomes
-            FROM sequences
-            WHERE seq_type = 'NT'
-            GROUP BY label
-            ORDER BY genomes DESC
-            LIMIT {limit}
-            """,
+            WITH base AS (
+                SELECT
+                    dataset_id,
+                    {raw} AS raw_label
+                FROM sequences
+                WHERE seq_type = 'NT'
+            )
+        SELECT
+            COALESCE(NULLIF(NULLIF(raw_label, ''), 'NA'), 'Unassigned') AS label,
+            COUNT(DISTINCT dataset_id) AS genomes
+        FROM base
+        GROUP BY 1
+        ORDER BY genomes DESC
+        {limit_sql}
+        """,
+            parquet_glob,
+        )
+    else:
+        column = PHYLO_COLUMNS.get(level)
+        if column is None:
+            raise ValueError(f"Unsupported taxonomy level: {level}")
+
+        limit_sql = _limit_clause(limit)
+        df = _frame_from_query(
+            f"""
+            WITH base AS (
+                SELECT
+                    dataset_id,
+                    NULLIF({column}, '') AS raw_label
+                FROM sequences
+                WHERE seq_type = 'NT'
+            )
+        SELECT
+            COALESCE(raw_label, 'Unassigned') AS label,
+            COUNT(DISTINCT dataset_id) AS genomes
+        FROM base
+        GROUP BY 1
+        ORDER BY genomes DESC
+        {limit_sql}
+        """,
             parquet_glob,
         )
 
-    column = PHYLO_COLUMNS.get(level)
-    if column is None:
-        raise ValueError(f"Unsupported taxonomy level: {level}")
-
-    return _frame_from_query(
-        f"""
-        SELECT
-            COALESCE(NULLIF({column}, ''), 'Unassigned') AS label,
-            COUNT(DISTINCT dataset_id) AS genomes
-        FROM sequences
-        WHERE seq_type = 'NT'
-        GROUP BY label
-        ORDER BY genomes DESC
-        LIMIT {limit}
-        """,
-        parquet_glob,
-    )
+    return df.head(limit) if limit else df
 
 
 def fetch_environment_distribution(
@@ -171,7 +231,9 @@ def fetch_environment_distribution(
         "source",
     ],
     parquet_glob: str | None = None,
-    limit: int = 30,
+    limit: int | None = 30,
+    *,
+    use_cache: bool = True,
 ) -> pd.DataFrame:
     """Return environment counts for the requested dimension."""
 
@@ -179,23 +241,47 @@ def fetch_environment_distribution(
     if column is None:
         raise ValueError(f"Unsupported environment dimension: {dimension}")
 
-    return _frame_from_query(
+    cache_name = f"environment_{dimension}.parquet"
+    if use_cache:
+        cache = _cache_frame(cache_name)
+        if cache is not None:
+            return cache.head(limit) if limit else cache.copy()
+
+    limit_sql = _limit_clause(limit)
+    df = _frame_from_query(
         f"""
+        WITH base AS (
+            SELECT
+                dataset_id,
+                {column} AS raw_label
+            FROM sequences
+        )
         SELECT
-            COALESCE({column}, 'Unknown') AS label,
+            COALESCE(NULLIF(raw_label, ''), 'Unassigned') AS label,
             COUNT(DISTINCT dataset_id) AS genomes,
             COUNT(*) AS sequences
-        FROM sequences
-        GROUP BY label
+        FROM base
+        GROUP BY 1
         ORDER BY genomes DESC
-        LIMIT {limit}
+        {limit_sql}
         """,
         parquet_glob,
     )
 
+    return df.head(limit) if limit else df
 
-def fetch_genome_statistics(parquet_glob: str | None = None) -> pd.DataFrame:
+
+def fetch_genome_statistics(
+    parquet_glob: str | None = None,
+    *,
+    use_cache: bool = True,
+) -> pd.DataFrame:
     """Return summary statistics for genomes with parsed taxonomy levels."""
+
+    if use_cache:
+        cache = _cache_frame("genome_statistics.parquet")
+        if cache is not None:
+            return cache.copy()
 
     df = _frame_from_query(
         """
@@ -256,43 +342,82 @@ def fetch_annotation_matrix(
         "emapper_Description",
     ] = "emapper_COG_category",
     parquet_glob: str | None = None,
-    limit: int = 25,
+    limit: int | None = 25,
+    *,
+    use_cache: bool = True,
 ) -> pd.DataFrame:
     """Return annotation counts grouped by GVClass order for heatmap visualisations."""
 
-    order_expr = _gvclass_rank_expr("order")
-    return _frame_from_query(
+    cache_name = f"annotations_{field}.parquet"
+    if use_cache:
+        cache = _cache_frame(cache_name)
+        if cache is not None:
+            return cache.head(limit) if limit else cache.copy()
+
+    raw_order = _gvclass_rank_raw("order")
+
+    limit_sql = _limit_clause(limit)
+    df = _frame_from_query(
         f"""
+        WITH base AS (
+            SELECT
+                {raw_order} AS raw_order,
+                NULLIF({field}, '') AS raw_annotation
+            FROM sequences
+            WHERE seq_type = 'AA'
+        )
         SELECT
-            {order_expr} AS gvclass_order,
-            COALESCE(NULLIF({field}, ''), 'Unannotated') AS annotation_value,
+            COALESCE(NULLIF(raw_order, 'NA'), 'Unassigned') AS gvclass_order,
+            COALESCE(raw_annotation, 'Unannotated') AS annotation_value,
             COUNT(*) AS sequences
-        FROM sequences
-        WHERE seq_type = 'AA'
-        GROUP BY gvclass_order, annotation_value
+        FROM base
+        GROUP BY 1, 2
         ORDER BY sequences DESC
-        LIMIT {limit}
+        {limit_sql}
         """,
         parquet_glob,
     )
 
+    return df.head(limit) if limit else df
 
-def fetch_cluster_summary(parquet_glob: str | None = None, limit: int = 50) -> pd.DataFrame:
+
+def fetch_cluster_summary(
+    parquet_glob: str | None = None,
+    limit: int | None = 50,
+    *,
+    use_cache: bool = True,
+) -> pd.DataFrame:
     """Summarise ANI clusters derived from skani results."""
 
-    order_expr = _gvclass_rank_expr("order")
-    return _frame_from_query(
+    if use_cache:
+        cache = _cache_frame("cluster_summary.parquet")
+        if cache is not None:
+            return cache.head(limit) if limit else cache.copy()
+
+    raw_order = _gvclass_rank_raw("order")
+    limit_sql = _limit_clause(limit)
+    df = _frame_from_query(
         f"""
+        WITH base AS (
+            SELECT
+                COALESCE(s_cluster, 'Unclustered') AS cluster_id,
+                dataset_id,
+                {raw_order} AS raw_order,
+                is_skani_representative
+            FROM sequences
+            WHERE seq_type = 'NT'
+        )
         SELECT
-            COALESCE(s_cluster, 'Unclustered') AS cluster_id,
+            cluster_id,
             COUNT(DISTINCT dataset_id) AS genomes,
             SUM(CASE WHEN is_skani_representative THEN 1 ELSE 0 END) AS representatives,
-            MIN({order_expr}) AS gvclass_order
-        FROM sequences
-        WHERE seq_type = 'NT'
+            COALESCE(MIN(NULLIF(raw_order, 'NA')), 'Unassigned') AS gvclass_order
+        FROM base
         GROUP BY cluster_id
         ORDER BY genomes DESC
-        LIMIT {limit}
+        {limit_sql}
         """,
         parquet_glob,
     )
+
+    return df.head(limit) if limit else df

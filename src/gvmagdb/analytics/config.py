@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
+from pathlib import Path
 
 
 @dataclass(frozen=True)
@@ -23,6 +24,8 @@ class DashboardSettings:
     host: str
     port: int
     debug: bool
+    cache_dir: Path
+    cache_enabled: bool
 
 
 def _env(name: str, default: str) -> str:
@@ -36,12 +39,17 @@ def load_settings() -> DashboardSettings:
     host = _env("GVMAGDB_DASH_HOST", "127.0.0.1")
     port = int(_env("GVMAGDB_DASH_PORT", "8050"))
     debug = _env("GVMAGDB_DASH_DEBUG", "false").lower() in {"1", "true", "yes", "on"}
+    cache_dir = Path(_env("GVMAGDB_ANALYTICS_CACHE_DIR", "artifacts/analytics")).resolve()
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    cache_enabled = _env("GVMAGDB_ANALYTICS_CACHE", "true").lower() in {"1", "true", "yes", "on"}
 
     return DashboardSettings(
         parquet_glob=parquet_glob,
         host=host,
         port=port,
         debug=debug,
+        cache_dir=cache_dir,
+        cache_enabled=cache_enabled,
     )
 
 

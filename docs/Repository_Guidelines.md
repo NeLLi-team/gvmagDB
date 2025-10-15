@@ -16,6 +16,7 @@ pixi run check               # fmt + lint + typecheck (Black, Ruff, mypy)
 pixi run test                # Pytest suite
 pixi run test-cov            # Coverage with HTML report
 pixi run dashboard           # Launch Plotly Dash analytics UI (host/port configurable)
+pixi run dashboard-cache     # Pre-compute dashboard aggregates (artifacts/analytics)
 ```
 CLI tasks map 1:1 to modules: e.g., `pixi run build-diamond`, `pixi run export-faa`, `pixi run search-hmm`.
 

@@ -109,6 +109,11 @@ PY
    Use `gvmagdb extract --hits gvmagdb_hits.tsv --fasta filtered_hits.faa --seq-type AA` to repackage results for downstream workflows.
 
 ## 4. Plotly Dashboards
+- **Pre-compute analytics cache** *(recommended)*:
+  ```bash
+  pixi run dashboard-cache
+  ```
+  Cached Parquet files are written to `artifacts/analytics/` (override via `GVMAGDB_ANALYTICS_CACHE_DIR`).
 - **Launch locally**:
   ```bash
   pixi run dashboard
@@ -121,8 +126,8 @@ PY
   4. Genome Statistics – interactively inspect genome length, GC%, coding density, and completeness.
   5. Annotations – heatmaps for COG/KEGG/PFAM signals across GVClass orders.
   6. Clusters & Quality – summarise ANI clusters and representative coverage.
-- **Data access**: the Dash app calls the shared DuckDB catalog (read-only) via `gvmagdb.analytics.data_access`, so no additional ingestion is required as long as `artifacts/parquet/` and `artifacts/products/` are present.
-- **Deployment**: wrap the app with Gunicorn or waitress (`python -m gvmagdb.analytics.app`) and expose via Cloudflare Tunnel (see `Cloudflare` configuration under `infrastructure/`, pending). Configure `GVMAGDB_PARQUET_GLOB`, `GVMAGDB_DASH_HOST`, `GVMAGDB_DASH_PORT`, and `GVMAGDB_DASH_DEBUG` environment variables as needed.
-- **Enhancements**: pre-compute heavy aggregates into `artifacts/analytics/` when dashboards start to receive production traffic; add authentication before exposing the app publicly.
+- **Data access**: the Dash app calls the shared DuckDB catalog (read-only) via `gvmagdb.analytics.data_access`, so no additional ingestion is required as long as `artifacts/parquet/` and `artifacts/products/` are present. Cached Parquet extracts are consumed automatically when available.
+- **Deployment**: wrap the app with Gunicorn or Waitress (`python -m gvmagdb.analytics.app`) and expose via Tailscale Funnel (`tailscale funnel --bg --https=443 --set-path=/ 127.0.0.1:8050/`) or your preferred reverse proxy. Configure `GVMAGDB_PARQUET_GLOB`, `GVMAGDB_DASH_HOST`, `GVMAGDB_DASH_PORT`, and `GVMAGDB_DASH_DEBUG` environment variables as needed.
+- **Enhancements**: enable authentication or Cloudflare Access before exposing the app publicly.
 
 Keep this document updated as commands evolve or the dashboard implementation lands.***
