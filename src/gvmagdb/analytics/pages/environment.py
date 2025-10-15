@@ -117,17 +117,20 @@ def update_environment_charts(dimension: str):
         title=f"Share of genomes by {dimension.replace('_', ' ')}",
     )
 
+    pretty_df = df.rename(
+        columns={
+            "label": dimension.replace("_", " ").title(),
+            "genomes": "Genomes",
+            "sequences": "Sequences",
+        }
+    )
+
     table = dbc.Table.from_dataframe(
-        df,
+        pretty_df,
         striped=True,
         bordered=False,
         hover=True,
         size="sm",
-        columns=[
-            {"name": dimension.replace("_", " ").title(), "id": "label"},
-            {"name": "Genomes", "id": "genomes"},
-            {"name": "Sequences", "id": "sequences"},
-        ],
     )
 
     return bar, pie, table

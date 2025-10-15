@@ -118,12 +118,6 @@ def update_annotations(field: str):
         inplace=True,
     )
 
-    table = dbc.Table.from_dataframe(
-        table_df,
-        striped=True,
-        bordered=False,
-        hover=True,
-        size="sm",
-    )
+    table = dbc.Table.from_dataframe(table_df, striped=True, bordered=False, hover=True, size="sm")
 
     return fig, table

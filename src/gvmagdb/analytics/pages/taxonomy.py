@@ -129,12 +129,11 @@ def update_taxonomy_graph(level: str, source: str):
     )
 
     table = dbc.Table.from_dataframe(
-        df,
+        df.rename(columns={"label": level.title(), "genomes": "Genomes"}),
         striped=True,
         bordered=False,
         hover=True,
         size="sm",
-        columns=[{"name": level.title(), "id": "label"}, {"name": "Genomes", "id": "genomes"}],
     )
 
     return fig, table

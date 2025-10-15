@@ -57,7 +57,7 @@ def get_connection(
 ) -> Iterator[catalog.duckdb.DuckDBPyConnection]:
     """Context manager that yields a read-only DuckDB connection."""
 
-    conn = catalog.connect(parquet_glob=_resolve_parquet_glob(parquet_glob), read_only=True)
+    conn = catalog.connect(parquet_glob=_resolve_parquet_glob(parquet_glob), read_only=False)
     try:
         yield conn
     finally:
