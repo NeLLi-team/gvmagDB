@@ -46,9 +46,29 @@ ENVIRONMENT_COLUMNS = {
     "source": "source",
 }
 
+GVCLASS_PREFIX = {
+    "domain": "d",
+    "phylum": "p",
+    "class": "c",
+    "order": "o",
+    "family": "f",
+    "genus": "g",
+    "species": "s",
+}
+
 
 def _resolve_parquet_glob(parquet_glob: str | None) -> str:
     return parquet_glob or SETTINGS.parquet_glob
+
+
+def _gvclass_rank_expr(level: str, fallback: str = "'Unassigned'") -> str:
+    prefix = GVCLASS_PREFIX[level]
+    pattern = f"{prefix}_([^;]+)"
+    return (
+        "COALESCE("
+        f"NULLIF(NULLIF(regexp_extract(taxonomy_majority, '{pattern}', 1), ''), 'NA'), "
+        f"{fallback})"
+    )
 
 
 @contextmanager
@@ -106,15 +126,30 @@ def fetch_taxonomy_distribution(
 ) -> pd.DataFrame:
     """Return taxonomy counts for the requested level and source."""
 
-    column_map = GVCLASS_COLUMNS if source == "gvclass" else PHYLO_COLUMNS
-    column = column_map.get(level)
+    if source == "gvclass":
+        label_expr = _gvclass_rank_expr(level)
+        return _frame_from_query(
+            f"""
+            SELECT
+                {label_expr} AS label,
+                COUNT(DISTINCT dataset_id) AS genomes
+            FROM sequences
+            WHERE seq_type = 'NT'
+            GROUP BY label
+            ORDER BY genomes DESC
+            LIMIT {limit}
+            """,
+            parquet_glob,
+        )
+
+    column = PHYLO_COLUMNS.get(level)
     if column is None:
         raise ValueError(f"Unsupported taxonomy level: {level}")
 
     return _frame_from_query(
         f"""
         SELECT
-            COALESCE({column}, 'Unknown') AS label,
+            COALESCE(NULLIF({column}, ''), 'Unassigned') AS label,
             COUNT(DISTINCT dataset_id) AS genomes
         FROM sequences
         WHERE seq_type = 'NT'
@@ -225,11 +260,12 @@ def fetch_annotation_matrix(
 ) -> pd.DataFrame:
     """Return annotation counts grouped by GVClass order for heatmap visualisations."""
 
+    order_expr = _gvclass_rank_expr("order")
     return _frame_from_query(
         f"""
         SELECT
-            COALESCE(gvclass_order, 'Unknown') AS gvclass_order,
-            COALESCE({field}, 'Unannotated') AS annotation_value,
+            {order_expr} AS gvclass_order,
+            COALESCE(NULLIF({field}, ''), 'Unannotated') AS annotation_value,
             COUNT(*) AS sequences
         FROM sequences
         WHERE seq_type = 'AA'
@@ -244,13 +280,14 @@ def fetch_annotation_matrix(
 def fetch_cluster_summary(parquet_glob: str | None = None, limit: int = 50) -> pd.DataFrame:
     """Summarise ANI clusters derived from skani results."""
 
+    order_expr = _gvclass_rank_expr("order")
     return _frame_from_query(
         f"""
         SELECT
             COALESCE(s_cluster, 'Unclustered') AS cluster_id,
             COUNT(DISTINCT dataset_id) AS genomes,
             SUM(CASE WHEN is_skani_representative THEN 1 ELSE 0 END) AS representatives,
-            MAX(gvclass_order) AS gvclass_order
+            MIN({order_expr}) AS gvclass_order
         FROM sequences
         WHERE seq_type = 'NT'
         GROUP BY cluster_id
