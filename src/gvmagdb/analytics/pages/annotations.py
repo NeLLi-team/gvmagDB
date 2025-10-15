@@ -53,6 +53,21 @@ def layout(**kwargs) -> html.Div:
                         md=4,
                         class_name="mb-3",
                     ),
+                    dbc.Col(
+                        dbc.Checklist(
+                            options=[
+                                {
+                                    "label": "Include unannotated sequences",
+                                    "value": "unannotated",
+                                }
+                            ],
+                            value=[],
+                            id="annotation-include-unannotated",
+                            switch=True,
+                        ),
+                        md=4,
+                        class_name="mb-3",
+                    ),
                 ]
             ),
             dbc.Row(
@@ -86,9 +101,16 @@ def layout(**kwargs) -> html.Div:
     Output("annotation-heatmap", "figure"),
     Output("annotation-table", "children"),
     Input("annotation-field", "value"),
+    Input("annotation-include-unannotated", "value"),
 )
-def update_annotations(field: str):
+def update_annotations(field: str, include_unannotated: list[str]):
     df = data_access.fetch_annotation_matrix(field)
+
+    if df.empty:
+        return _empty_figure("No annotation data available"), html.P("No data to display.")
+
+    if "unannotated" not in include_unannotated:
+        df = df[df["annotation_value"] != "Unannotated"]
 
     if df.empty:
         return _empty_figure("No annotation data available"), html.P("No data to display.")
@@ -108,14 +130,12 @@ def update_annotations(field: str):
         title="Annotation enrichment across GVClass orders",
     )
 
-    table_df = df.copy()
-    table_df.rename(
+    table_df = df.rename(
         columns={
             "gvclass_order": "GVClass order",
             "annotation_value": "Annotation",
             "sequences": "Sequences",
-        },
-        inplace=True,
+        }
     )
 
     table = dbc.Table.from_dataframe(table_df, striped=True, bordered=False, hover=True, size="sm")

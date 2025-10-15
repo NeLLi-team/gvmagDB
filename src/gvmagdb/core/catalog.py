@@ -6,17 +6,13 @@ without ingesting data. Supports local and remote (S3/GCS) Parquet files.
 """
 
 from pathlib import Path
-from typing import Union
 
 import duckdb
 import pandas as pd
 
 
-DatabasePath = Union[Path, str]
-
-
 def connect(
-    db_path: DatabasePath | None = Path("artifacts/duckdb/gvmagdb.duckdb"),
+    db_path: Path | str | None = Path("artifacts/duckdb/gvmagdb.duckdb"),
     parquet_glob: str = "artifacts/parquet/sequences/**/*.parquet",
     s3_config: dict | None = None,
     read_only: bool = False,

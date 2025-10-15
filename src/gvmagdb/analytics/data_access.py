@@ -160,9 +160,9 @@ def fetch_environment_distribution(
 
 
 def fetch_genome_statistics(parquet_glob: str | None = None) -> pd.DataFrame:
-    """Return summary statistics for genome length, gene count, GC%, coding density."""
+    """Return summary statistics for genomes with parsed taxonomy levels."""
 
-    return _frame_from_query(
+    df = _frame_from_query(
         """
         SELECT
             dataset_id,
@@ -170,15 +170,47 @@ def fetch_genome_statistics(parquet_glob: str | None = None) -> pd.DataFrame:
             MAX(genecount) AS gene_count,
             AVG(gcperc) AS gc_percent,
             AVG(codingperc) AS coding_percent,
+            MAX(contigs) AS contig_count,
+            MAX(order_completeness) AS completeness,
+            MAX(order_dup) AS contamination,
             MAX(taxonomy_majority) AS taxonomy_majority,
-            MAX(ecosystem) AS ecosystem,
-            MAX(order_completeness) AS order_completeness
+            MAX(ecosystem) AS ecosystem
         FROM sequences
         WHERE seq_type = 'NT'
         GROUP BY dataset_id
         """,
         parquet_glob,
     )
+
+    if df.empty:
+        return df
+
+    taxonomy_map = {
+        "taxonomy_domain": "d",
+        "taxonomy_phylum": "p",
+        "taxonomy_class": "c",
+        "taxonomy_order": "o",
+        "taxonomy_family": "f",
+        "taxonomy_genus": "g",
+        "taxonomy_species": "s",
+    }
+
+    for column, prefix in taxonomy_map.items():
+        df[column] = (
+            df["taxonomy_majority"]
+            .str.extract(rf"{prefix}_([^;]+)")
+            .iloc[:, 0]
+            .fillna("Unassigned")
+        )
+
+    df["genome_length_mb"] = df["genome_length"] / 1e6
+    df["gc_percent"] = df["gc_percent"].astype(float)
+    df["coding_percent"] = df["coding_percent"].astype(float)
+    df["completeness"] = df["completeness"].astype(float).fillna(0.0)
+    df["contamination"] = df["contamination"].astype(float).fillna(0.0)
+    df["contig_count"] = df["contig_count"].fillna(0).astype(int)
+
+    return df
 
 
 def fetch_annotation_matrix(
