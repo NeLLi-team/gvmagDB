@@ -6,13 +6,17 @@ without ingesting data. Supports local and remote (S3/GCS) Parquet files.
 """
 
 from pathlib import Path
+from typing import Union
 
 import duckdb
 import pandas as pd
 
 
+DatabasePath = Union[Path, str]
+
+
 def connect(
-    db_path: Path = Path("artifacts/duckdb/gvmagdb.duckdb"),
+    db_path: DatabasePath | None = Path("artifacts/duckdb/gvmagdb.duckdb"),
     parquet_glob: str = "artifacts/parquet/sequences/**/*.parquet",
     s3_config: dict | None = None,
     read_only: bool = False,
@@ -35,10 +39,12 @@ def connect(
         >>> print(f"Total NT sequences: {result[0]}")
     """
     # Ensure db directory exists
-    db_path.parent.mkdir(parents=True, exist_ok=True)
-
-    # Connect to DuckDB
-    conn = duckdb.connect(str(db_path), read_only=read_only)
+    if db_path is None or str(db_path) == ":memory:":
+        conn = duckdb.connect(database=":memory:")
+    else:
+        db_path = Path(db_path)
+        db_path.parent.mkdir(parents=True, exist_ok=True)
+        conn = duckdb.connect(str(db_path), read_only=read_only)
 
     # Configure for performance
     conn.execute("SET memory_limit='16GB'")
