@@ -51,13 +51,23 @@ def _resolve_parquet_glob(parquet_glob: str | None) -> str:
     return parquet_glob or SETTINGS.parquet_glob
 
 
+@lru_cache(maxsize=4)
+def _bootstrap_view(parquet_glob: str) -> None:
+    """Ensure the DuckDB 'sequences' view exists for analytics queries."""
+
+    conn = catalog.connect(parquet_glob=parquet_glob, read_only=False)
+    catalog.close(conn)
+
+
 @contextmanager
 def get_connection(
     parquet_glob: str | None = None,
 ) -> Iterator[catalog.duckdb.DuckDBPyConnection]:
     """Context manager that yields a read-only DuckDB connection."""
 
-    conn = catalog.connect(parquet_glob=_resolve_parquet_glob(parquet_glob), read_only=False)
+    resolved_glob = _resolve_parquet_glob(parquet_glob)
+    _bootstrap_view(resolved_glob)
+    conn = catalog.connect(parquet_glob=resolved_glob, read_only=True)
     try:
         yield conn
     finally:
