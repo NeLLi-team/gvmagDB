@@ -26,6 +26,7 @@ class DashboardSettings:
     debug: bool
     cache_dir: Path
     cache_enabled: bool
+    metadata_path: Path | None
 
 
 def _env(name: str, default: str) -> str:
@@ -42,6 +43,10 @@ def load_settings() -> DashboardSettings:
     cache_dir = Path(_env("GVMAGDB_ANALYTICS_CACHE_DIR", "artifacts/analytics")).resolve()
     cache_dir.mkdir(parents=True, exist_ok=True)
     cache_enabled = _env("GVMAGDB_ANALYTICS_CACHE", "true").lower() in {"1", "true", "yes", "on"}
+    metadata_env = _env("GVMAGDB_METADATA_PATH", "ingestion_data/Updated_naming_Sept2025.tsv")
+    metadata_path = Path(metadata_env).resolve()
+    if not metadata_path.exists():
+        metadata_path = None
 
     return DashboardSettings(
         parquet_glob=parquet_glob,
@@ -50,6 +55,7 @@ def load_settings() -> DashboardSettings:
         debug=debug,
         cache_dir=cache_dir,
         cache_enabled=cache_enabled,
+        metadata_path=metadata_path,
     )
 
 

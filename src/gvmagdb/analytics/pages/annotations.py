@@ -18,6 +18,15 @@ FIELD_OPTIONS = [
     {"label": "Descriptions", "value": "emapper_Description"},
 ]
 
+LEVEL_OPTIONS = [
+    {"label": "Order", "value": "order"},
+    {"label": "Family", "value": "family"},
+    {"label": "Genus", "value": "genus"},
+    {"label": "Class", "value": "class"},
+    {"label": "Phylum", "value": "phylum"},
+    {"label": "Domain", "value": "domain"},
+]
+
 
 def _empty_figure(message: str) -> dict:
     fig = px.scatter()
@@ -51,6 +60,15 @@ def layout(**kwargs) -> html.Div:
                             value="emapper_COG_category",
                         ),
                         md=4,
+                        class_name="mb-3",
+                    ),
+                    dbc.Col(
+                        dbc.Select(
+                            id="annotation-tax-level",
+                            options=LEVEL_OPTIONS,
+                            value="order",
+                        ),
+                        md=3,
                         class_name="mb-3",
                     ),
                     dbc.Col(
@@ -101,10 +119,11 @@ def layout(**kwargs) -> html.Div:
     Output("annotation-heatmap", "figure"),
     Output("annotation-table", "children"),
     Input("annotation-field", "value"),
+    Input("annotation-tax-level", "value"),
     Input("annotation-include-unannotated", "value"),
 )
-def update_annotations(field: str, include_unannotated: list[str]):
-    df = data_access.fetch_annotation_matrix(field)
+def update_annotations(field: str, level: str, include_unannotated: list[str]):
+    df = data_access.fetch_annotation_matrix(field, level=level)
 
     if df.empty:
         return _empty_figure("No annotation data available"), html.P("No data to display.")

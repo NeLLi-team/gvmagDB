@@ -79,6 +79,22 @@ def _cache_frame(name: str) -> pd.DataFrame | None:
     return _cached_parquet(str(path))
 
 
+@lru_cache(maxsize=1)
+def _metadata_frame() -> pd.DataFrame | None:
+    path = SETTINGS.metadata_path
+    if path is None:
+        return None
+    if not path.exists():
+        return None
+    df = pd.read_csv(path, sep="\t", keep_default_na=False, na_values=["NA", "N/A"])
+    df.columns = [col.lower().replace(" ", "_").replace("/", "_") for col in df.columns]
+    if "genome" in df.columns:
+        df = df.rename(columns={"genome": "dataset_id"})
+    if "order_completeness" in df.columns:
+        df["order_completeness"] = pd.to_numeric(df["order_completeness"], errors="coerce")
+    return df
+
+
 def _gvclass_rank_expr(level: str, fallback: str = "'Unassigned'") -> str:
     raw = _gvclass_rank_raw(level)
     return "COALESCE(" f"NULLIF(NULLIF({raw}, ''), 'NA'), {fallback})"
@@ -306,6 +322,17 @@ def fetch_genome_statistics(
     if df.empty:
         return df
 
+    metadata_df = _metadata_frame()
+    if metadata_df is not None and "dataset_id" in metadata_df.columns:
+        meta_subset = metadata_df[["dataset_id", "order_completeness"]].copy()
+        df = df.merge(meta_subset, on="dataset_id", how="left", suffixes=("", "_meta"))
+        if "order_completeness" in df.columns:
+            df["completeness"] = df["order_completeness"].fillna(df["completeness"])
+            df.drop(columns=["order_completeness"], inplace=True)
+    df.rename(columns={"contamination": "order_dup"}, inplace=True)
+    df["order_dup"] = df["order_dup"].astype(float)
+    df.rename(columns={"order_dup": "contamination"}, inplace=True)
+
     taxonomy_map = {
         "taxonomy_domain": "d",
         "taxonomy_phylum": "p",
@@ -344,24 +371,28 @@ def fetch_annotation_matrix(
     parquet_glob: str | None = None,
     limit: int | None = 25,
     *,
+    level: Literal["order", "family", "genus", "class", "phylum", "domain"] = "order",
     use_cache: bool = True,
 ) -> pd.DataFrame:
     """Return annotation counts grouped by GVClass order for heatmap visualisations."""
 
-    cache_name = f"annotations_{field}.parquet"
+    if level not in GVCLASS_PREFIX:
+        raise ValueError(f"Unsupported GVClass level: {level}")
+
+    cache_name = f"annotations_{field}_{level}.parquet"
     if use_cache:
         cache = _cache_frame(cache_name)
         if cache is not None:
             return cache.head(limit) if limit else cache.copy()
 
-    raw_order = _gvclass_rank_raw("order")
+    raw_rank = _gvclass_rank_raw(level)
 
     limit_sql = _limit_clause(limit)
     df = _frame_from_query(
         f"""
         WITH base AS (
             SELECT
-                {raw_order} AS raw_order,
+                {raw_rank} AS raw_order,
                 NULLIF({field}, '') AS raw_annotation
             FROM sequences
             WHERE seq_type = 'AA'

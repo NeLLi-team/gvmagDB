@@ -24,6 +24,7 @@ ANNOTATION_FIELDS: tuple[str, ...] = (
     "emapper_PFAMs",
     "emapper_Description",
 )
+ANNOTATION_LEVELS: tuple[str, ...] = ("order", "family", "genus", "class", "phylum", "domain")
 
 
 def _write_parquet(name: str, df: pd.DataFrame) -> Path:
@@ -73,13 +74,21 @@ def build_cache(parquet_glob: str | None = None) -> None:
     _write_parquet("genome_statistics", genome_stats)
 
     for field in ANNOTATION_FIELDS:
-        df = data_access.fetch_annotation_matrix(
-            field,
-            parquet_glob,
-            limit=None,
-            use_cache=False,
-        )
-        _write_parquet(f"annotations_{field}", df)
+        level_frames: list[pd.DataFrame] = []
+        for level in ANNOTATION_LEVELS:
+            df = data_access.fetch_annotation_matrix(
+                field,
+                parquet_glob,
+                limit=None,
+                level=level,
+                use_cache=False,
+            )
+            _write_parquet(f"annotations_{field}_{level}", df)
+            df = df.copy()
+            df.insert(0, "level", level)
+            level_frames.append(df)
+        combined = pd.concat(level_frames, ignore_index=True)
+        _write_parquet(f"annotations_{field}", combined)
 
     cluster_summary = data_access.fetch_cluster_summary(parquet_glob, limit=1000)
     _write_parquet("cluster_summary", cluster_summary)
