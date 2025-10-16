@@ -1,0 +1,15 @@
+[Unit]
+Description=gvmagDB Plotly Dash Dashboard
+After=network.target tailscaled.service
+
+[Service]
+Type=simple
+WorkingDirectory=/home/fschulz/dev/gvmagDB
+Environment=PIXIPATH=/home/fschulz/dev/gvmagDB
+ExecStart=/home/fschulz/dev/gvmagDB/.pixi/envs/default/bin/python -m gvmagdb.analytics.app
+Restart=on-failure
+RestartSec=5
+User=fschulz
+
+[Install]
+WantedBy=multi-user.target

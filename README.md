@@ -57,6 +57,7 @@ flowchart LR
 - Ingestion pulls FASTA/metadata from `ingestion_data/`, enriches with ProteinOrtho & eggNOG annotations, and writes Parquet partitions plus search products into `artifacts/`.
 - Query commands read DuckDB views (no duplication) and reuse generated FASTA/DMND artifacts.
 - The Plotly Dash dashboards consume the same artifacts via read-only DuckDB connections (see `docs/Database_Workflows.md` and `docs/Repository_Guidelines.md`).
+- For background deployment, install the systemd unit in `dashboard/gvmagdb-dashboard.service` and enable Tailscale Funnel (see `docs/Deployment.md`).
 
 ## Analytics Cache
 
